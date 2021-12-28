@@ -34,6 +34,8 @@ import groovy.json.JsonBuilder
 @Field final String DEFAULT_TIME_UNIT = "month"
 @Field final int DEFAULT_TIME_INTERVAL = 1
 
+@Field final String SCRIPT_FILE_PATH = "plugins/${this.class.name}.groovy"
+
 class Global {
     static Boolean stopCleaning = false
     static Boolean pauseCleaning = false
@@ -99,6 +101,16 @@ executions {
                 Global.pauseCleaning = false
                 log.info "Resume request detected"
                 break
+            case "setCurrentTime":
+                Global.stopCleaning = true
+                log.info "Will update the script timestamp. Reload the plugin after this"
+                SimpleDateFormat sdf = new SimpleDateFormat("MM-dd-yyyy HH:mm:ss");
+                def scriptFile = new File(ctx.artifactoryHome.etcDir, SCRIPT_FILE_PATH)
+                log.info "Last Modified Date (before):- " + sdf.format(scriptFile.lastModified())
+                
+                scriptFile.setLastModified(new Date().getTime());
+                log.info "Last Modified Date (after):- " + sdf.format(scriptFile.lastModified())
+                break
             default:
                 log.info "Missing or invalid command, '$command'"
         }
@@ -139,17 +151,14 @@ executions {
 
                             }
                             else { 
-                               // cleanup Policy defined for the very first  time
-                                   synchronized (configMutex) {
-                                    // configData?.policies = newCleanupjson?.policies
-                                    configData = new JsonBuilder(newCleanupjson).toPrettyString()
-                                   }
-                            
-                               if(writeToConfigFile()) {
+                               // COnfig file is empty. Cleanup Policy defined for the very first  time , hence not using writeToConfigFile() as it resiults in json with \n
+
+                                  def configFile = new File(ctx.artifactoryHome.etcDir, CONFIG_FILE_PATH)
+                                  configFile.write(new JsonBuilder(newCleanupjson).toPrettyString())
                                    log.info "writing  newCleanupjson successful"
                                    message = "Successfully Added Team cleanup  Policy " + JsonOutput.prettyPrint(JsonOutput.toJson(newCleanupjson))
                                    status = 200
-                               }                                   
+                               
                             }
                         
                         break
@@ -345,16 +354,6 @@ private def UpdateRepoCleanupPolicyAndNoDuplicates(newCleanupjson){
                 synchronized (configMutex) {
                     configData?.policies = finalPolicies
                 }
-            /*=========
-            def builder = new JsonBuilder()
-            builder {
-                policies  finalPolicies
-            } 
-            log.info builder.toPrettyString()
-            configFile.text = ''
-
-            configFile.write(builder.toPrettyString())
-            ============*/
         }
 
         return duplicate_repos
