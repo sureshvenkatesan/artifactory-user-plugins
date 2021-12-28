@@ -25,6 +25,10 @@ import groovy.transform.Field
 
 import java.text.SimpleDateFormat
 
+import org.artifactory.resource.ResourceStreamHandle
+import groovy.json.JsonOutput
+import groovy.json.JsonBuilder
+
 @Field final String CONFIG_FILE_PATH = "plugins/${this.class.name}.json"
 @Field final String PROPERTIES_FILE_PATH = "plugins/${this.class.name}.properties"
 @Field final String DEFAULT_TIME_UNIT = "month"
@@ -47,6 +51,11 @@ class Global {
 // curl -i -uadmin:password -X POST "http://localhost:8081/artifactory/api/plugins/execute/cleanupCtl?params=command=adjustPaceTimeMS;value=-1000"
 
 def pluginGroup = 'cleaners'
+//def newCleanupjson = null // the new Team Repos Cleanup policy list 
+// The cleanup config cache. A thread-safe, write-through cache for the Cleanup config
+// file.
+configMutex = new Object()
+configData = null
 
 executions {
     cleanup(groups: [pluginGroup]) { params ->
@@ -93,6 +102,335 @@ executions {
             default:
                 log.info "Missing or invalid command, '$command'"
         }
+    }
+
+    addTeamRepoCleanup(version: '1.0', description: 'Add cleanup schedule for Team Repos', httpMethod: 'POST', groups: [pluginGroup]) { params, ResourceStreamHandle body ->
+        def command = params['command'] ? params['command'][0] as String : ''
+
+                switch ( command ) {
+                    case "TeamRepoCleanup":
+                        // ensure that the request body is not empty
+                            assert body
+                            def newCleanupjson = new JsonSlurper().parse(new InputStreamReader(body.inputStream))
+                            log.info "Appending new Team Onboarding Cleanup Policy. Received following Team Policy"
+                            log.info JsonOutput.prettyPrint(JsonOutput.toJson(newCleanupjson))
+
+                            if (isConfigFileNotEmpty()) {
+                            // If a configuration already exists, don't replace it: The PUT endpoint
+                            // should be used for that instead
+                                if(CheckRepoCleanupPolicyExists(newCleanupjson)){
+                                    status = 409
+                                    message = "Team Repos clean policy already exists on this instance. Use 'PUT' to update"
+                                    return
+                                }
+                                else{
+                                        log.info "writing/appending the newCleanupjson to the configFile"
+                                        synchronized (configMutex) {
+                                            newCleanupjson?.policies.each { policy ->
+                                                configData.policies << policy
+                                            }
+                                        }
+                                        if(writeToConfigFile()) {
+                                           log.info "writing  finalCleanupjson successful"
+                                           message = "Successfully Added Team cleanup  Policy " + JsonOutput.prettyPrint(JsonOutput.toJson(newCleanupjson))
+                                           status = 200
+                                       }   
+                                }
+
+                            }
+                            else { 
+                               // cleanup Policy defined for the very first  time
+                                   synchronized (configMutex) {
+                                    // configData?.policies = newCleanupjson?.policies
+                                    configData = new JsonBuilder(newCleanupjson).toPrettyString()
+                                   }
+                            
+                               if(writeToConfigFile()) {
+                                   log.info "writing  newCleanupjson successful"
+                                   message = "Successfully Added Team cleanup  Policy " + JsonOutput.prettyPrint(JsonOutput.toJson(newCleanupjson))
+                                   status = 200
+                               }                                   
+                            }
+                        
+                        break
+                    default:
+                        log.info "Missing or invalid command, '$command'"
+                        status = 400
+                        return
+        }
+    }
+
+    updateTeamRepoCleanup(version: '1.0', description:'Update cleanup schedule for Team Repos', httpMethod: 'PUT', groups: [pluginGroup]) { params, ResourceStreamHandle body ->
+        def command = params['command'] ? params['command'][0] as String : ''
+
+                switch ( command ) {
+                    case "TeamRepoCleanup":
+                        // ensure that the request body is not empty
+                            assert body
+                            def newCleanupjson = new JsonSlurper().parse(new InputStreamReader(body.inputStream))
+                            log.info "Updating new Team Onboarding Cleanup Policy. Received following Team Policy"
+                            log.info JsonOutput.prettyPrint(JsonOutput.toJson(newCleanupjson))
+
+                            if (isConfigFileNotEmpty()) {
+                                // If a configuration already exists, don't replace it: The PUT endpoint
+                                // should be used for that instead
+                                    if(CheckRepoCleanupPolicyExists(newCleanupjson)){
+                                        // Will this result in duplicate cleanup policy for the Team's Repos
+                                        def duplicateRepos = UpdateRepoCleanupPolicyAndNoDuplicates(newCleanupjson)
+                                        if(duplicateRepos)
+                                        {
+                                            status = 409
+                                            message = "Will result in duplicate cleanup policy for these Team Repos : ${duplicateRepos}"
+                                            return
+                                        }
+                                        else {
+                                            // Will not resut in duplicate cleanup policy for these Team Repos. Ok to Update
+                                                if(writeToConfigFile()) {
+                                                log.info "writing  finalCleanupjson successful"
+                                                message = "Successfully Updated Team cleanup  Policy " + JsonOutput.prettyPrint(JsonOutput.toJson(newCleanupjson))
+                                                status = 200
+                                            }   
+                                        }
+                                }
+                                else {
+                                    // No team repo cleanup policies exist
+                                    status = 409
+                                    message = "Team Repos clean policy does not exists on this instance. Use 'POST' to add new policy for repos used by this team"
+                                    return 
+                                }
+                            }
+                            else { 
+                               // cleanup Policy defined for the very first  time
+                                    status = 409
+                                    message = "Team Repos clean policy does not exists on this instance. Use 'POST' to add new policy for repos used by this team"
+                                    return                               
+                            }                                    
+                        break
+                    default:
+                        log.info "Missing or invalid command, '$command'"
+                        status = 400
+        }
+    }
+
+    deleteTeamRepoCleanup(version:'1.0', description:'Delete cleanup schedule for Team Repos', httpMethod: 'POST', groups: [pluginGroup]) { params, ResourceStreamHandle body ->
+        def command = params['command'] ? params['command'][0] as String : ''
+
+                switch ( command ) {
+                    case "TeamRepoCleanup":
+                        // ensure that the request body is not empty
+                            assert body
+                            def newCleanupjson = new JsonSlurper().parse(new InputStreamReader(body.inputStream))
+                            log.info "Deleting Team Onboarding Cleanup Policy. Received following Team Policy to delete"
+                            log.info JsonOutput.prettyPrint(JsonOutput.toJson(newCleanupjson))
+
+                            if (isConfigFileNotEmpty()) {
+                                // If a configuration already exists, only then you can delete it
+                                def deletedRepos = DeleteRepoCleanupPolicy(newCleanupjson)
+                                    if(deletedRepos){
+
+                                            // Save the repo policy deletes to config file 
+                                            if(writeToConfigFile()) {
+                                                log.info "Deletion of cleanup policies and writing config successful"
+                                                message = "Successfully Deleted Team cleanup  Policy " + JsonOutput.prettyPrint(JsonOutput.toJson(newCleanupjson))
+                                                status = 200
+                                            }   
+                                    }
+                                    else {
+                                        // No team repo cleanup policies exist
+                                        status = 409
+                                        message = "Cannot Delete as Team Repos clean policy does not exists on this instance."
+                                        return 
+                                    }
+                            }
+                            else { 
+                               // No team repo cleanup policies exist
+                                    status = 409
+                                    message = "Cannot Delete as config is empty and so Team Repos clean policy does not exists on this instance."
+                                    return                               
+                            }                                    
+                        break
+                    default:
+                        log.info "Missing or invalid command, '$command'"
+                        status = 400
+        }
+    }
+
+
+}
+
+// returns list of repos for which the cleanup policies have to be DELETED 
+private def DeleteRepoCleanupPolicy(newCleanupjson){
+        def finalPolicies = [] 
+        def final_repos_to_clean_up = []
+
+        configData?.policies.each { oldpolicy ->
+            def delete_oldpolicy = false
+            newCleanupjson?.policies.each { newpolicy ->
+                if(!(newpolicy.repos).disjoint(oldpolicy.repos) ) {
+                    //disjoint() method returns true if there's no item that is common to both lists
+                    // Since now there is a  repo thta is common in old and new policy replace old policy with new
+                    delete_oldpolicy = true
+                    final_repos_to_clean_up << (oldpolicy.containsKey("repos") ? oldpolicy.repos  : ["__none__"])
+                    //log.info "if-> finalPolicies ${finalPolicies} "
+                    log.info "In DeleteRepoCleanupPolicy -> final_repos_to_clean_up ${final_repos_to_clean_up} "
+                }
+            }
+                    if(!delete_oldpolicy){
+                        // the old policy will not be deleted . So keep the old policy.
+                        finalPolicies << oldpolicy
+                    }
+
+        }
+
+
+        final_repos_to_clean_up.collectMany{ it } // same as flatten the list
+
+        if (final_repos_to_clean_up?.size() > 0) {
+                synchronized (configMutex) {
+                    configData?.policies = finalPolicies
+                }
+            
+        }
+        else {
+            log.warn "Cannot update config as there are no matching team  policies to delete"
+        }
+
+        return final_repos_to_clean_up
+
+
+}
+
+
+// returns list of repos with could have duplicate cleanup policies. If no duplicates then updates configData with the new Policies 
+private def UpdateRepoCleanupPolicyAndNoDuplicates(newCleanupjson){
+        def finalPolicies = [] 
+        def final_repos_to_clean_up = []
+
+        configData?.policies.each { oldpolicy ->
+            def replace_oldpolicy = false
+            newCleanupjson?.policies.each { newpolicy ->
+                if(!(newpolicy.repos).disjoint(oldpolicy.repos) ) {
+                    //disjoint() method returns true if there's no item that is common to both lists
+                    // Since now there is a  repo thta is common in old and new policy replace old policy with new
+                    replace_oldpolicy = true
+                    finalPolicies << newpolicy
+                    final_repos_to_clean_up << (newpolicy.containsKey("repos") ? newpolicy.repos  : ["__none__"])
+                    log.info "if-> finalPolicies ${finalPolicies} "
+                    log.info "if-> final_repos_to_clean_up ${final_repos_to_clean_up} "
+                }
+            }
+                    if(!replace_oldpolicy){
+                        // the old policy was not replaced . So keep the old policy.
+                        finalPolicies << oldpolicy
+                        final_repos_to_clean_up << (oldpolicy.containsKey("repos") ? oldpolicy.repos  : ["__none__"])
+                        log.info "else -> finalPolicies ${finalPolicies}"
+                        log.info "else -> final_repos_to_clean_up ${final_repos_to_clean_up} "
+
+                    }
+
+        }
+
+
+        final_repos_to_clean_up.collectMany{ it } // same as flatten the list
+        def unique_repos = []
+        def duplicate_repos = []
+
+        final_repos_to_clean_up.each { unique_repos.contains(it) ? duplicate_repos << it : unique_repos << it }
+
+        if (duplicate_repos?.size() > 0) {
+            log.warn "Cannot update config as there are duplicate cleanup policies for repos ${duplicate_repos}"
+        }
+        else {
+
+                synchronized (configMutex) {
+                    configData?.policies = finalPolicies
+                }
+            /*=========
+            def builder = new JsonBuilder()
+            builder {
+                policies  finalPolicies
+            } 
+            log.info builder.toPrettyString()
+            configFile.text = ''
+
+            configFile.write(builder.toPrettyString())
+            ============*/
+        }
+
+        return duplicate_repos
+
+
+}
+
+// returns true if the cleanup policy for any of the team repos already exists
+private boolean CheckRepoCleanupPolicyExists(json) {
+
+    //def config = new JsonSlurper().parse(configFile.toURL())
+    def currentRepos = []
+     log.info "In isValidTeamOnBoardCleanupPolicy"
+    configData.policies.each { policySettings1 ->
+       currentRepos << policySettings1.repos
+    }
+    //currentRepos.flatten()
+    currentRepos.collectMany{ it }
+
+    def newrepos = []
+    json?.policies.each { policySettings2 ->
+       log.info "policySettings2: ${policySettings2.repos}"
+       newrepos << (policySettings2.containsKey("repos") ? policySettings2.repos  : ["__none__"])
+    }
+      //newrepos.flatten()
+      newrepos.collectMany{ it }
+
+       log.info "currentRepos: ${currentRepos} "
+       log.info "newrepos: ${newrepos}"
+       //disjoint() method returns true if there's no item that is common to both lists. 
+       if (currentRepos.disjoint(newrepos) == true)
+       {
+           log.info "the new config contains repos for which clean has not been configured yet"  
+           return false
+       }
+       else {
+           def duplicate_repos = currentRepos.intersect(newrepos)
+           log.warn "Clean for repos '${duplicate_repos}' are already defined. Remove them from the newConfig and try again"
+           return true
+       }
+
+}
+
+// USed for all writes to the config file
+private def writeToConfigFile(){
+
+    log.info "writing newCleanupjson"
+    synchronized (configMutex) {
+       def configFile = new File(ctx.artifactoryHome.etcDir, CONFIG_FILE_PATH) 
+       //configFile.write(new JsonBuilder(CleanupPoliciesJson).toPrettyString())
+       //configData?.policies = newCleanupjson?.policies
+       if (configData)
+       {
+         configFile.write (new  JsonBuilder(configData).toPrettyString())
+        log.info "writing ${configData}"
+         return true;
+       }
+    }
+    return false;
+}
+
+// Return the cached config file from the 'configData' global. If the
+// configuration has not yet been cached, read it from the config file first.
+
+private def isConfigFileNotEmpty() {
+    synchronized (configMutex) {
+       // if (!configData ) {
+            // Not cached yet. So cache it now.
+            def configFile = new File(ctx.artifactoryHome.etcDir, CONFIG_FILE_PATH)
+            if ( configFile.exists()) {
+                configData = new JsonSlurper().parse(configFile.toURL())
+                log.debug "Config file loaded successfully from disk."
+            }
+
+        //}
+        return configData
     }
 }
 
