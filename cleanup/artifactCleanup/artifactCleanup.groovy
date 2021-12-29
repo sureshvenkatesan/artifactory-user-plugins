@@ -53,7 +53,7 @@ class Global {
 // curl -i -uadmin:password -X POST "http://localhost:8081/artifactory/api/plugins/execute/cleanupCtl?params=command=adjustPaceTimeMS;value=-1000"
 
 def pluginGroup = 'cleaners'
-//def newCleanupjson = null // the new Team Repos Cleanup policy list 
+
 // The cleanup config cache. A thread-safe, write-through cache for the Cleanup config
 // file.
 configMutex = new Object()
@@ -221,6 +221,8 @@ executions {
         }
     }
 
+    // Using POST instaed of DELETE to delete  Team repo cleanup policies because , 
+    //DELETE fails with error similar to https://stackoverflow.com/questions/25704985/groovy-httpbuilder-producing-error-when-parsing-valid-json
     deleteTeamRepoCleanup(version:'1.0', description:'Delete cleanup schedule for Team Repos', httpMethod: 'POST', groups: [pluginGroup]) { params, ResourceStreamHandle body ->
         def command = params['command'] ? params['command'][0] as String : ''
 
@@ -509,7 +511,7 @@ private def artifactCleanup(String timeUnit, int timeInterval, String[] repos, l
     def calendarUntilFormatted = new SimpleDateFormat("yyyy/MM/dd HH:mm").format(calendarUntil.getTime());
     log.info "Removing all artifacts not downloaded since $calendarUntilFormatted"
 
-    Global.stopCleaning = false
+    //Global.stopCleaning = false
     int cntFoundArtifacts = 0
     int cntNoDeletePermissions = 0
     long bytesFound = 0
