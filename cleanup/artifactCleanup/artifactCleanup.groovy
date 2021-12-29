@@ -151,14 +151,14 @@ executions {
 
                             }
                             else { 
-                               // COnfig file is empty. Cleanup Policy defined for the very first  time , hence not using writeToConfigFile() as it resiults in json with \n
+                               // Config file is empty. Cleanup Policy defined for the very first  time , hence not using configData to writeToConfigFile() as it results in json with \n
 
-                                  def configFile = new File(ctx.artifactoryHome.etcDir, CONFIG_FILE_PATH)
-                                  configFile.write(new JsonBuilder(newCleanupjson).toPrettyString())
-                                   log.info "writing  newCleanupjson successful"
-                                   message = "Successfully Added Team cleanup  Policy " + JsonOutput.prettyPrint(JsonOutput.toJson(newCleanupjson))
-                                   status = 200
-                               
+                                  if(writeToConfigFile(newCleanupjson)) {
+                                      log.info "writing  newCleanupjson successful"
+                                      message = "Successfully Added Team cleanup  Policy " + JsonOutput.prettyPrint(JsonOutput.toJson(newCleanupjson))
+                                      status = 200
+                                  }
+
                             }
                         
                         break
@@ -400,14 +400,22 @@ private boolean CheckRepoCleanupPolicyExists(json) {
 }
 
 // USed for all writes to the config file
-private def writeToConfigFile(){
+private def writeToConfigFile(newCleanupjson){
 
     log.info "writing newCleanupjson"
     synchronized (configMutex) {
        def configFile = new File(ctx.artifactoryHome.etcDir, CONFIG_FILE_PATH) 
        //configFile.write(new JsonBuilder(CleanupPoliciesJson).toPrettyString())
        //configData?.policies = newCleanupjson?.policies
-       if (configData)
+       if(newCleanupjson)
+       {
+           // writing to config file for the first time
+           configFile.write(new JsonBuilder(newCleanupjson).toPrettyString())
+           log.info "writing ${newCleanupjson}"
+           return true
+
+       }
+       else if (configData)
        {
          configFile.write (new  JsonBuilder(configData).toPrettyString())
         log.info "writing ${configData}"
