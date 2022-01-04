@@ -202,4 +202,5 @@ Here policy2.json contains a list of cleanup policies for the various local repo
 - To reload the updated cleanup policies in `artifactCleanup.json` touch the `artifactCleanup.groovy` plugin script and reload :
 
 `curl -X POST -v -u admin:password  "http://localhost:8080/artifactory/api/plugins/execute/cleanupCtl?params=command=setCurrentTime"`
+
 `curl -X POST -v -u admin:password  "http://localhost:8080/artifactory/api/plugins/reload"`
