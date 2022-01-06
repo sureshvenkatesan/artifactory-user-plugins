@@ -20,7 +20,13 @@ import groovy.json.JsonBuilder
 import java.util.concurrent.TimeUnit
 import org.artifactory.repo.RepoPathFactory
 
+import groovy.json.JsonSlurper
+import org.artifactory.resource.ResourceStreamHandle
+import groovy.json.JsonOutput
+
+
 // usage: curl -X POST http://localhost:8088/artifactory/api/plugins/execute/cleanDockerImages
+//def pluginGroup = 'cleaners'
 
 executions {
     cleanDockerImages() { params ->
@@ -37,6 +43,54 @@ executions {
         def json = [status: 'okay', dryRun: dryRun, deleted: deleted]
         message = new JsonBuilder(json).toPrettyString()
         status = 200
+    }
+
+// POST a list of repos to add or delete from the dockerRepos in the CleanDockerImagesTest.properties
+// Optionally you can also restrict access to this api by using "groups: [pluginGroup]" parameter to updateDockerReposToClean
+    updateDockerReposToClean(version: '1.0', description: 'Update the Docker repositories to clean', httpMethod: 'POST') { params, ResourceStreamHandle body ->
+        def command = params['command'] ? params['command'][0] as String : ''
+
+        def propsfile = new File(ctx.artifactoryHome.etcDir, "plugins/cleanDockerImages.properties")
+        def repos = new ConfigSlurper().parse(propsfile.toURL()).dockerRepos
+        // ensure that the request body is not empty
+        assert body
+        def newCleanupReposList = new JsonSlurper().parse(new InputStreamReader(body.inputStream)).dockerRepos
+
+                switch ( command ) {
+                    case "AddReposToClean":
+                          log.info "Appending new docker repos to clean"
+                          log.info JsonOutput.prettyPrint(JsonOutput.toJson(newCleanupReposList))
+                          newCleanupReposList.each { 
+                            repos << it
+                          } 
+                          repos.unique()
+                          def repos_as_string = repos.inspect().replaceAll("\'", "\"")
+                          propsfile.write("dockerRepos = ${repos_as_string}")
+
+                          message = "dockerRepos = ${repos_as_string}"
+                          status = 200
+                          break
+
+                    case "DeleteReposToClean":
+                          log.info "Docker repos not to clean"
+                          log.info JsonOutput.prettyPrint(JsonOutput.toJson(newCleanupReposList))
+                          newCleanupReposList.each { 
+                            repos -= it
+                          }
+                          //repos.minus(newCleanupReposList)
+                          repos.unique()
+                          def repos_as_string = repos.inspect().replaceAll("\'", "\"")
+                          propsfile.write("dockerRepos = ${repos_as_string}")
+                          
+                          message = "dockerRepos = ${repos_as_string}"
+                          status = 200
+                          break
+                                
+                    default:
+                        log.info "Missing or invalid command, '$command'"
+                        status = 400
+                        return
+        }
     }
 }
 

@@ -52,3 +52,25 @@ A dry run can also be triggered:
 ``` shell
 curl -XPOST -uadmin:password "http://localhost:8081/artifactory/api/plugins/execute/cleanDockerImages?params=dryRun=true"
 ```
+
+- To add a new list of docker repositories to cleanup
+``` shell
+curl -X POST -v -u admin:password -H 'Content-Type: application/json'  "http://localhost:8081/artifactory/api/plugins/execute/updateDockerReposToClean?params=command=AddReposToClean" -T docker1.json
+```
+Here docker1.json contains the new list of docker repositories that needs to be added to the dockerRepos in the CleanDockerImagesTest.properties
+```json
+{
+    "dockerRepos": ["example-docker-local-3","example-docker-local-4"]
+}
+```
+
+- To remove a list of docker repositories from dockerRepos in the CleanDockerImagesTest.properties , that do not need cleanup
+``` shell
+curl -X POST -v -u admin:password -H 'Content-Type: application/json'  "http://localhost:8081/artifactory/api/plugins/execute/updateDockerReposToClean?params=command=DeleteReposToClean" -T docker2.json
+```
+Here docker2.json contains a list of docker repositories to remove from dockerRepos in the CleanDockerImagesTest.properties 
+```json
+{
+    "dockerRepos": ["example-docker-local-2","example-docker-local-3"]
+}
+```
