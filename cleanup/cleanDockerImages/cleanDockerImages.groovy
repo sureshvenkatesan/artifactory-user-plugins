@@ -45,7 +45,7 @@ executions {
         status = 200
     }
 
-// POST a list of repos to add or delete from the dockerRepos in the CleanDockerImagesTest.properties
+// POST a list of repos to add or delete from the dockerRepos in the CleanDockerImages.properties
 // Optionally you can also restrict access to this api by using "groups: [pluginGroup]" parameter to updateDockerReposToClean
     updateDockerReposToClean(version: '1.0', description: 'Update the Docker repositories to clean', httpMethod: 'POST') { params, ResourceStreamHandle body ->
         def command = params['command'] ? params['command'][0] as String : ''
