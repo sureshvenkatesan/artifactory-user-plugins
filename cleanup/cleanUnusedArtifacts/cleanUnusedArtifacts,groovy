@@ -1,0 +1,66 @@
+import org.artifactory.fs.ItemInfo
+
+import org.artifactory.repo.RepoPath
+import org.artifactory.api.repo.exception.ItemNotFoundRuntimeException
+import org.artifactory.repo.RepoPathFactory
+import org.artifactory.search.aql.AqlResult
+ 
+
+executions {
+
+    cleanUnusedArtifacts() {
+
+        List<String> localDockerRepoKeys = getLocalDockerRepositories()
+        log.info "==============Fetched list of docker repos"
+
+        //loop through each repo key
+            localDockerRepoKeys.find { String repoKey ->
+                log.info "Looking for Docker repos in the repo $repoKey"
+
+                //def aql = "items.find({ \"repo\": { \"\$eq\":\"" + repoKey + "\"  },          \"name\": {  \"\$eq\": \"manifest.json\"          },          \"stat.downloaded\": {            \"\$before\": \"4w\"          }        }).include( \"path\")"
+                        // "items.find({\"repo\":\"" + repoKey + "\",\"type\": \"any\",\"@cleanup.skip\":\"true\"}).include(\"repo\", \"path\", \"name\", \"type\")" 
+                // To do :  if this  repo should not be cleaned return false i.e continue to next "repoKey" -> This is already done in getLocalDockerRepositories()
+                
+                // else this repo has to be cleaned .  If tag was never downloaded and  "Last Modified" i.e "updated" is more than 4w  the delete it.
+                // Also if tag was downloaded atleast once but was not downloaded for  more than 4w  the delete it.
+                        def aql = "items.find({ \"repo\": { \"\$eq\":\"${repoKey}\" }, \"name\": { \"\$eq\": \"manifest.json\" }, \"\$or\":[ { \"\$and\": [ { \"stat.downloads\": { \"\$eq\":null } }, { \"updated\": { \"\$before\": \"4w\" } } ] }, { \"\$and\": [ { \"stat.downloads\": { \"\$gt\": 0 } }, { \"stat.downloaded\": { \"\$before\": \"4w\" } } ] } ] }).include(\"repo\", \"name\", \"path\", \"updated\", \"sha256\", \"stat.downloads\", \"stat.downloaded\")"
+
+                
+               searches.aql(aql.toString()) { AqlResult result ->
+                    result.each { dockertag ->
+
+                        try {
+                            def DockerTag_in_repo = "$dockertag.repo/$dockertag.path"
+                            RepoPath detetingTag_repopath = RepoPathFactory.create("$DockerTag_in_repo")
+                                if (security.canDelete(detetingTag_repopath)) {
+                                    log.info "Deleting tag $DockerTag_in_repo"
+                                    repositories.delete detetingTag_repopath
+                                } else {
+                                    log.info "Can't delete $DockerTag_in_repo (user ${security.currentUser().getUsername()} has no delete permissions)"
+                                }
+
+                        }
+                        catch (ItemNotFoundRuntimeException ex) {
+                                log.info "Failed to find $dockertag, skipping"
+                        }
+
+                    }
+               }
+            }
+
+
+    }
+}
+
+private List<String> getLocalDockerRepositories() {
+    List<String> localRepoKeys = repositories.getLocalRepositories()
+
+    localRepoKeys.findAll { String repoKey ->
+        if(repositories.getRepositoryConfiguration(repoKey)?.isEnableDockerSupport()){
+            !repositories.getProperty(RepoPathFactory.create(repoKey),"cleanup.skip")?.equalsIgnoreCase("true")
+               
+
+        }
+          
+    }
+}
