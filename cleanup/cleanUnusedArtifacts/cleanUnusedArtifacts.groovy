@@ -19,7 +19,6 @@ import groovy.json.JsonBuilder
 
 //@Field final def DEFAULT_SCHEDULE_JSON = new JsonSlurper().parseText('{"timeUnit": "day", "timeInterval": 30, "dryRun": true, "paceTimeMS": 500, "disablePropertiesSupport": false}')
 @Field final def DEFAULT_SCHEDULE_TEXT = '{"timeUnit": "minute", "timeInterval": 1, "dryRun": true, "paceTimeMS": 500, "disablePropertiesSupport": false}'
-//@Field final def DEFAULT_SCHEDULE_TEXT = "{'timeUnit': 'minute', 'timeInterval': 1, 'dryRun': true, 'paceTimeMS': 500, 'disablePropertiesSupport': false}"
 @Field final def DEFAULT_SCHEDULE_JSON = new JsonSlurper().parseText(DEFAULT_SCHEDULE_TEXT)
 
 class Global {
@@ -50,90 +49,42 @@ executions {
 
         switch ( command ) {
             case "list":
-            log.info "List policies request detected"
-            List<String> local_repos = getLocalReposNeedingCleanup()
-            List<String> federated_repos = getFederatedReposNeedingCleanup()
-            
-            def jsonSlurper = new JsonSlurper()
-            log.info  "testing"
-           /* local_repos.each{
-                log.info jsonSlurper.parseText(it).toPrettyString()
+                    log.info "List policies request detected"
+                    List<String> local_repos = getLocalReposNeedingCleanup()
+                    List<String> federated_repos = getFederatedReposNeedingCleanup()
+                    
+                    def jsonSlurper = new JsonSlurper()
+        
+                    def allrepos = []
+                    def builder  = new JsonBuilder()
+                    local_repos.each { repoKey ->
+                                        builder {
+                                            "$repoKey" jsonSlurper.parseText(repositories.getProperty(RepoPathFactory.create(repoKey),"cleanup.schedule")?:DEFAULT_SCHEDULE_TEXT)
+                                        }
+                                    allrepos.add(builder.toString())
+                    }
 
-            }*/
-            //log.info JsonOutput.prettyPrint(JsonOutput.toJson(local_repos))
-            
-            //List<String> federated_repos = repositories.getFederatedRepositories()
+                    federated_repos.each { repoKey ->
+                                        builder {
+                                            "$repoKey" jsonSlurper.parseText(repositories.getProperty(RepoPathFactory.create(repoKey),"cleanup.schedule")?:DEFAULT_SCHEDULE_TEXT)
+                                        }
+                                    allrepos.add(builder.toString())
+                    }
 
+                    builder {
+                        policies  jsonSlurper.parseText(allrepos.toString())
+                    }
 
-           
-          /* 
-            def root = builder {
-
-                //policies local_repos.collect {JsonOutput.prettyPrint(it)}
-                //policies local_repos.collect {JsonOutput.toJson(it)}
-                policies local_repos.collect { log.info "--" + it
-                                              it.replaceAll("\\\\", "")
-                                              }
-
-            } */
-
-           /* builder {
-                policies builder(local_repos)
-            }*/
-
-           /* builder {
-
-                //policies local_repos.collect {JsonOutput.prettyPrint(it)}
-                //policies local_repos.collect {JsonOutput.toJson(it)}
-                local local_repos.each { repoKey ->
-                                             //"\"" +  "${repoKey}" + "\"" +  " :  ${repositories.getProperty(RepoPathFactory.create(repoKey),"cleanup.schedule")?:DEFAULT_SCHEDULE_TEXT}"
-                                             "${repoKey} : ${repositories.getProperty(RepoPathFactory.create(repoKey),"cleanup.schedule")?:DEFAULT_SCHEDULE_TEXT}"
-                                          }
-
-            } */
-            def allrepos = []
-            def builder  = new JsonBuilder()
-            local_repos.each { repoKey ->
-                                builder {
-                                    //repoName repoKey
-                                    //schedule jsonSlurper.parseText(repositories.getProperty(RepoPathFactory.create(repoKey),"cleanup.schedule")?:DEFAULT_SCHEDULE_TEXT)
-                                    "$repoKey" jsonSlurper.parseText(repositories.getProperty(RepoPathFactory.create(repoKey),"cleanup.schedule")?:DEFAULT_SCHEDULE_TEXT)
-                                }
-                            allrepos.add(builder.toString())
-            }
-
-            federated_repos.each { repoKey ->
-                                builder {
-                                    //repoName repoKey
-                                    //schedule jsonSlurper.parseText(repositories.getProperty(RepoPathFactory.create(repoKey),"cleanup.schedule")?:DEFAULT_SCHEDULE_TEXT)
-                                    "$repoKey" jsonSlurper.parseText(repositories.getProperty(RepoPathFactory.create(repoKey),"cleanup.schedule")?:DEFAULT_SCHEDULE_TEXT)
-                                }
-                            allrepos.add(builder.toString())
-            }
-
-            //def jsonSlurper1 = new JsonSlurper()
-            // def items = jsonSlurper.parseText(allrepos.toString())
-
-           // def json_output = new JsonBuilder()
-           // json_output "policies": items
-
-                                builder {
-                                    //repoName repoKey
-                                    //schedule jsonSlurper.parseText(repositories.getProperty(RepoPathFactory.create(repoKey),"cleanup.schedule")?:DEFAULT_SCHEDULE_TEXT)
-                                    policies  jsonSlurper.parseText(allrepos.toString())
-                                }
-
-            //message = json_output.toPrettyString()
-            message = builder.toPrettyString()
-            status = 200
-            break
+                    message = builder.toPrettyString()
+                    status = 200
+                    break
             default:
                 log.info "Missing or invalid command, '$command'"
           
         }
 
 
-        }
+    }
 }
 
 
@@ -145,21 +96,10 @@ private List<String> getLocalReposNeedingCleanup() {
     localRepoKeys.findAll { String repoKey ->
         !repositories.getProperty(RepoPathFactory.create(repoKey),"cleanup.skip")?.equalsIgnoreCase("true")          
     }
-    /*======
-    def jsonSlurper = new JsonSlurper()
- 
-    List<String> schedules  = localRepoKeys_with_cleanup_schedule.collect { repoKey ->
-            //jsonSlurper.parseText("${repoKey} : ${jsonSlurper.parseText(repositories.getProperty(RepoPathFactory.create(repoKey),"cleanup.schedule")?:DEFAULT_SCHEDULE_TEXT)?: DEFAULT_SCHEDULE_JSON}").toPrettyString()
-            //log.info "\"${repoKey}\" : " + "${repositories.getProperty(RepoPathFactory.create(repoKey),"cleanup.schedule")?:DEFAULT_SCHEDULE_TEXT}"
-            log.info "\"" +  "${repoKey}" + "\"" +  " :  ${repositories.getProperty(RepoPathFactory.create(repoKey),"cleanup.schedule")?:DEFAULT_SCHEDULE_TEXT}"
-            //"\"${repoKey}\" : ${repositories.getProperty(RepoPathFactory.create(repoKey),"cleanup.schedule")?:DEFAULT_SCHEDULE_TEXT}"
-            "\"" +  "${repoKey}" + "\"" +  " : ${repositories.getProperty(RepoPathFactory.create(repoKey),"cleanup.schedule")?:DEFAULT_SCHEDULE_TEXT}"
-        }
-        =========*/
 
 }
 
-//Returns a List of Local  repos that need cleanup i.e  Have no "cleanup.skip" or  "cleanup.skip" is not "true"
+//Returns a List of Federated  repos that need cleanup i.e  Have no "cleanup.skip" or  "cleanup.skip" is not "true"
 private List<String> getFederatedReposNeedingCleanup() {
     List<String> federatedRepoKeys = repositories.getFederatedRepositories()
     
@@ -238,17 +178,17 @@ private boolean cleanupLocalDockerRepos() {
 
         //loop through each repo key
             localDockerRepoKeys.find { String repoKey ->
-                log.info "testing0 $DEFAULT_SCHEDULE_JSON" 
+
                 log.info "Looking for  repos in the repo $repoKey"
                 // Here  I am using the aql Relative Time Operators as the "timeUnit". Default cleanup Schedule is 4 weeks.
                 
                 def jsonSlurper = new JsonSlurper()
                 def scheduleJson = jsonSlurper.parseText(repositories.getProperty(RepoPathFactory.create(repoKey),"cleanup.schedule")?:DEFAULT_SCHEDULE_TEXT)?: DEFAULT_SCHEDULE_JSON
                 assert scheduleJson instanceof Map
-                log.info "testing1"
+
                 def timeUnit = scheduleJson.containsKey("timeUnit") ? scheduleJson.timeUnit as String : DEFAULT_SCHEDULE_JSON.timeUnit  as String
                 def timeInterval = scheduleJson.containsKey("timeInterval") ? scheduleJson.timeInterval as int : DEFAULT_SCHEDULE_JSON.timeInterval as int
-log.info "testing2"
+
                 def paceTimeMS = scheduleJson.containsKey("paceTimeMS") ? scheduleJson.paceTimeMS as int : DEFAULT_SCHEDULE_JSON.paceTimeMS as int
                 def dryRun = scheduleJson.containsKey("dryRun") ? new Boolean(scheduleJson.dryRun) : new Boolean(DEFAULT_SCHEDULE_JSON.dryRun)
                 def disablePropertiesSupport = scheduleJson.containsKey("disablePropertiesSupport") ? new Boolean(scheduleJson.disablePropertiesSupport) :  new Boolean(DEFAULT_SCHEDULE_JSON.disablePropertiesSupport)
@@ -258,9 +198,7 @@ log.info "testing2"
                 String cleanupInterval = mapTimeUnitToAql(timeUnit, String.valueOf(timeInterval))
                 log.info "cleanupInterval for this repo is --> ${cleanupInterval}"
 
-                //def aql = "items.find({ \"repo\": { \"\$eq\":\"" + repoKey + "\"  },          \"name\": {  \"\$eq\": \"manifest.json\"          },          \"stat.downloaded\": {            \"\$before\": \"4w\"          }        }).include( \"path\")"
-                        // "items.find({\"repo\":\"" + repoKey + "\",\"type\": \"any\",\"@cleanup.skip\":\"true\"}).include(\"repo\", \"path\", \"name\", \"type\")" 
-                // Done:  if this  repo should not be cleaned return false i.e continue to next "repoKey" -> This is already done in getLocalDockerRepositories()
+                // Done:  if this  repo should not be cleaned return false i.e continue to next "repoKey" -> This is already done in getLocalDockerReposNeedingCleanup()
                 
                 // else this repo has to be cleaned as below:
                 // If tag was never downloaded and  "Last Modified" i.e "updated" is more than cleanupInterval  then delete it.
@@ -268,7 +206,6 @@ log.info "testing2"
                
                 def aql = "items.find({ \"repo\": { \"\$eq\":\"${repoKey}\" }, \"name\": { \"\$eq\": \"manifest.json\" }, \"\$or\":[ { \"\$and\": [ { \"stat.downloads\": { \"\$eq\":null } }, { \"updated\": { \"\$before\": \"${cleanupInterval}\" } } ] }, { \"\$and\": [ { \"stat.downloads\": { \"\$gt\": 0 } }, { \"stat.downloaded\": { \"\$before\": \"${cleanupInterval}\" } } ] } ] }).include(\"repo\", \"name\", \"path\", \"updated\", \"sha256\", \"stat.downloads\", \"stat.downloaded\")"
 
-               log.info "testing3 $aql"
                docker_artifactsCleanup(  timeUnit,  timeInterval,  aql,  repoKey, paceTimeMS, dryRun , disablePropertiesSupport)
 
  
@@ -440,17 +377,6 @@ private boolean cleanupNonDockerRepos(List<String> NonDockerRepoKeys ) {
 
 }
 
-/* private boolean cleanupFederatedNonDockerRepos() {
-       //  cleanup NOn-Docker local repos that need cleanup i.e  Have no "cleanup.skip" or  "cleanup.skip" is not "true"
-        List<String> federatedNonDockerRepoKeys = getFederatedNonDockerReposNeedingCleanup()
-        log.info "==============Fetched list of Non-docker Federated repos that need cleanup"
-                //loop through each repo key
-        federatedNonDockerRepoKeys.find { String repoKey ->
-                log.info "Looking for Non-Docker  repos in the repo $repoKey"
-        }
-        return true
-
-} */
 
 private def non_docker_artifactCleanup(String timeUnit, int timeInterval,  String repokey, paceTimeMS, dryRun = true, disablePropertiesSupport = false) {
     log.info "Starting artifact cleanup for repository $repokey, until $timeInterval ${timeUnit}s ago with pacing interval $paceTimeMS ms, dryrun: $dryRun, disablePropertiesSupport: $disablePropertiesSupport"
@@ -485,7 +411,7 @@ private def non_docker_artifactCleanup(String timeUnit, int timeInterval,  Strin
                 log.info "Stopping by request, ending loop"
                 return true
             }
-            //log.info "testting4 , checking delete for $it"
+
             if ( ! disablePropertiesSupport && skip[ repokey ] && StringUtils.startsWithAny(it.path, skip[ repokey ])){
                 if (log.isDebugEnabled()){
                     log.debug "Skip $it"
