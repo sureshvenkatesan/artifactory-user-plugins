@@ -14,8 +14,12 @@ import groovy.transform.Field
 import java.text.SimpleDateFormat
 import org.apache.commons.lang3.StringUtils
 
+import groovy.json.JsonOutput
+import groovy.json.JsonBuilder
+
 //@Field final def DEFAULT_SCHEDULE_JSON = new JsonSlurper().parseText('{"timeUnit": "day", "timeInterval": 30, "dryRun": true, "paceTimeMS": 500, "disablePropertiesSupport": false}')
 @Field final def DEFAULT_SCHEDULE_TEXT = '{"timeUnit": "minute", "timeInterval": 1, "dryRun": true, "paceTimeMS": 500, "disablePropertiesSupport": false}'
+//@Field final def DEFAULT_SCHEDULE_TEXT = "{'timeUnit': 'minute', 'timeInterval': 1, 'dryRun': true, 'paceTimeMS': 500, 'disablePropertiesSupport': false}"
 @Field final def DEFAULT_SCHEDULE_JSON = new JsonSlurper().parseText(DEFAULT_SCHEDULE_TEXT)
 
 class Global {
@@ -27,6 +31,8 @@ class Global {
 
 executions {
 
+    //curl -X POST -n "$URL/artifactory/api/plugins/reload"
+    //curl -X POST -n  "$URL/artifactory/api/plugins/execute/cleanUnusedArtifacts"
     cleanUnusedArtifacts() {
         // The aql for the cleanup of Docker repos for  local and Federated differ
         cleanupLocalDockerRepos() 
@@ -37,6 +43,132 @@ executions {
         cleanupNonDockerRepos(getFederatedNonDockerReposNeedingCleanup()) 
         //cleanupFederatedNonDockerRepos()
     }
+    
+    //curl -X POST -n  "$URL/artifactory/api/plugins/execute/cleanupPolicies?params=command=list"
+    cleanupPolicies() { params ->
+        def command = params['command'] ? params['command'][0] as String : ''
+
+        switch ( command ) {
+            case "list":
+            log.info "List policies request detected"
+            List<String> local_repos = getLocalReposNeedingCleanup()
+            List<String> federated_repos = getFederatedReposNeedingCleanup()
+            
+            def jsonSlurper = new JsonSlurper()
+            log.info  "testing"
+           /* local_repos.each{
+                log.info jsonSlurper.parseText(it).toPrettyString()
+
+            }*/
+            //log.info JsonOutput.prettyPrint(JsonOutput.toJson(local_repos))
+            
+            //List<String> federated_repos = repositories.getFederatedRepositories()
+
+
+           
+          /* 
+            def root = builder {
+
+                //policies local_repos.collect {JsonOutput.prettyPrint(it)}
+                //policies local_repos.collect {JsonOutput.toJson(it)}
+                policies local_repos.collect { log.info "--" + it
+                                              it.replaceAll("\\\\", "")
+                                              }
+
+            } */
+
+           /* builder {
+                policies builder(local_repos)
+            }*/
+
+           /* builder {
+
+                //policies local_repos.collect {JsonOutput.prettyPrint(it)}
+                //policies local_repos.collect {JsonOutput.toJson(it)}
+                local local_repos.each { repoKey ->
+                                             //"\"" +  "${repoKey}" + "\"" +  " :  ${repositories.getProperty(RepoPathFactory.create(repoKey),"cleanup.schedule")?:DEFAULT_SCHEDULE_TEXT}"
+                                             "${repoKey} : ${repositories.getProperty(RepoPathFactory.create(repoKey),"cleanup.schedule")?:DEFAULT_SCHEDULE_TEXT}"
+                                          }
+
+            } */
+            def allrepos = []
+            def builder  = new JsonBuilder()
+            local_repos.each { repoKey ->
+                                builder {
+                                    //repoName repoKey
+                                    //schedule jsonSlurper.parseText(repositories.getProperty(RepoPathFactory.create(repoKey),"cleanup.schedule")?:DEFAULT_SCHEDULE_TEXT)
+                                    "$repoKey" jsonSlurper.parseText(repositories.getProperty(RepoPathFactory.create(repoKey),"cleanup.schedule")?:DEFAULT_SCHEDULE_TEXT)
+                                }
+                            allrepos.add(builder.toString())
+            }
+
+            federated_repos.each { repoKey ->
+                                builder {
+                                    //repoName repoKey
+                                    //schedule jsonSlurper.parseText(repositories.getProperty(RepoPathFactory.create(repoKey),"cleanup.schedule")?:DEFAULT_SCHEDULE_TEXT)
+                                    "$repoKey" jsonSlurper.parseText(repositories.getProperty(RepoPathFactory.create(repoKey),"cleanup.schedule")?:DEFAULT_SCHEDULE_TEXT)
+                                }
+                            allrepos.add(builder.toString())
+            }
+
+            //def jsonSlurper1 = new JsonSlurper()
+            // def items = jsonSlurper.parseText(allrepos.toString())
+
+           // def json_output = new JsonBuilder()
+           // json_output "policies": items
+
+                                builder {
+                                    //repoName repoKey
+                                    //schedule jsonSlurper.parseText(repositories.getProperty(RepoPathFactory.create(repoKey),"cleanup.schedule")?:DEFAULT_SCHEDULE_TEXT)
+                                    policies  jsonSlurper.parseText(allrepos.toString())
+                                }
+
+            //message = json_output.toPrettyString()
+            message = builder.toPrettyString()
+            status = 200
+            break
+            default:
+                log.info "Missing or invalid command, '$command'"
+          
+        }
+
+
+        }
+}
+
+
+//Returns a List of Local  repos that need cleanup i.e  Have no "cleanup.skip" or  "cleanup.skip" is not "true"
+private List<String> getLocalReposNeedingCleanup() {
+    List<String> localRepoKeys = repositories.getLocalRepositories()
+    
+
+    localRepoKeys.findAll { String repoKey ->
+        !repositories.getProperty(RepoPathFactory.create(repoKey),"cleanup.skip")?.equalsIgnoreCase("true")          
+    }
+    /*======
+    def jsonSlurper = new JsonSlurper()
+ 
+    List<String> schedules  = localRepoKeys_with_cleanup_schedule.collect { repoKey ->
+            //jsonSlurper.parseText("${repoKey} : ${jsonSlurper.parseText(repositories.getProperty(RepoPathFactory.create(repoKey),"cleanup.schedule")?:DEFAULT_SCHEDULE_TEXT)?: DEFAULT_SCHEDULE_JSON}").toPrettyString()
+            //log.info "\"${repoKey}\" : " + "${repositories.getProperty(RepoPathFactory.create(repoKey),"cleanup.schedule")?:DEFAULT_SCHEDULE_TEXT}"
+            log.info "\"" +  "${repoKey}" + "\"" +  " :  ${repositories.getProperty(RepoPathFactory.create(repoKey),"cleanup.schedule")?:DEFAULT_SCHEDULE_TEXT}"
+            //"\"${repoKey}\" : ${repositories.getProperty(RepoPathFactory.create(repoKey),"cleanup.schedule")?:DEFAULT_SCHEDULE_TEXT}"
+            "\"" +  "${repoKey}" + "\"" +  " : ${repositories.getProperty(RepoPathFactory.create(repoKey),"cleanup.schedule")?:DEFAULT_SCHEDULE_TEXT}"
+        }
+        =========*/
+
+}
+
+//Returns a List of Local  repos that need cleanup i.e  Have no "cleanup.skip" or  "cleanup.skip" is not "true"
+private List<String> getFederatedReposNeedingCleanup() {
+    List<String> federatedRepoKeys = repositories.getFederatedRepositories()
+    
+
+    federatedRepoKeys.findAll { String repoKey ->
+        !repositories.getProperty(RepoPathFactory.create(repoKey),"cleanup.skip")?.equalsIgnoreCase("true")          
+    }
+
+
 }
 
 
