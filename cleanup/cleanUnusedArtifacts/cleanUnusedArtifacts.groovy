@@ -33,10 +33,11 @@ import org.apache.commons.lang3.StringUtils
 import groovy.json.JsonOutput
 import groovy.json.JsonBuilder
 
-
+// TO DO: Change the DEFAULT_SCHEDULE_TEXT  to 30 day and DEFAULT_CRON_CLEANUP_SCHEDULE to Once a day before deplying to QA or PROD
 //@Field final def DEFAULT_SCHEDULE_JSON = new JsonSlurper().parseText('{"timeUnit": "day", "timeInterval": 30, "dryRun": true, "paceTimeMS": 500, "disablePropertiesSupport": false}')
-@Field final def DEFAULT_SCHEDULE_TEXT = '{"timeUnit": "minute", "timeInterval": 1, "dryRun": true, "paceTimeMS": 500, "disablePropertiesSupport": false}'
+@Field final String DEFAULT_SCHEDULE_TEXT = '{"timeUnit": "minute", "timeInterval": 1, "dryRun": true, "paceTimeMS": 500, "disablePropertiesSupport": false}'
 @Field final def DEFAULT_SCHEDULE_JSON = new JsonSlurper().parseText(DEFAULT_SCHEDULE_TEXT)
+@Field final String DEFAULT_CRON_CLEANUP_SCHEDULE = "0/30 * * * * ?"
 
 class Global {
     static Boolean stopCleaning = false
@@ -105,7 +106,7 @@ executions {
 // create cron job on Plugin  startup
 
 jobs {
-    "scheduled_from_cleanUnusedArtifacts"(cron: "0/30 * * * * ?") {
+    "scheduled_from_cleanUnusedArtifacts"(cron: DEFAULT_CRON_CLEANUP_SCHEDULE) {
         log.info "Creating  cron cleanup Job"
 
         cleanupAllLocalandFederatedRepos()
@@ -177,18 +178,31 @@ private def cleanupAllLocalandFederatedRepos()
         def timeStart = new Date()
         log.info "=========================Starting  cleanupAllLocalandFederatedRepos"
 
-        // The aql for the cleanup of Docker repos for  local and Federated differ
-        cleanupLocalDockerRepos() 
-        cleanupFederatedDockerRepos()
-
+        // The "aql" for the cleanup of Docker repos for  local and Federated differ and that is why I have different methods 
+        // cleanupLocalDockerRepos() and cleanupFederatedDockerRepos()
+        if ( !Global.stopCleaning ) {
+            log.info "Stopping cleanupLocalDockerRepos() by request"
+            cleanupLocalDockerRepos() 
+        }
+        if ( !Global.stopCleaning ) {
+            log.info "Stopping cleanupLocalDockerRepos() by request"
+            cleanupFederatedDockerRepos() 
+        }
         // For the non-docker repos I just use the  "searches.artifactsNotDownloadedSince" API.
-        cleanupNonDockerRepos(getLocalNonDockerReposNeedingCleanup()) 
-        cleanupNonDockerRepos(getFederatedNonDockerReposNeedingCleanup()) 
-        //cleanupFederatedNonDockerRepos()
+        if ( !Global.stopCleaning ) {
+            log.info "Stopping cleanupLocalDockerRepos() by request"
+            cleanupNonDockerRepos(getLocalNonDockerReposNeedingCleanup())  
+        }
+        if ( !Global.stopCleaning ) {
+            log.info "Stopping cleanupLocalDockerRepos() by request"
+            cleanupNonDockerRepos(getFederatedNonDockerReposNeedingCleanup()) 
+        }            
+
         
         def timeStop = new Date()
         TimeDuration duration = TimeCategory.minus(timeStop, timeStart)
         log.info "========================= Total Cleanup Elapsed time for all repos : " + duration
+        return true
 
 }
 
