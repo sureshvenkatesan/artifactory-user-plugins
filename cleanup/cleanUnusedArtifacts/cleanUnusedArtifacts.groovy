@@ -14,25 +14,20 @@
  * limitations under the License.
  */
 
-import org.artifactory.fs.ItemInfo
 
-import org.artifactory.repo.RepoPath
-import org.artifactory.api.repo.exception.ItemNotFoundRuntimeException
-import org.artifactory.repo.RepoPathFactory
-import org.artifactory.search.aql.AqlResult
+import groovy.json.JsonBuilder
 import groovy.json.JsonSlurper
-import org.artifactory.exception.CancelException
-
 import groovy.time.TimeCategory
 import groovy.time.TimeDuration
 import groovy.transform.Field
+import org.apache.commons.lang3.StringUtils
+import org.artifactory.api.repo.exception.ItemNotFoundRuntimeException
+import org.artifactory.exception.CancelException
+import org.artifactory.repo.RepoPath
+import org.artifactory.repo.RepoPathFactory
+import org.artifactory.search.aql.AqlResult
 
 import java.text.SimpleDateFormat
-import org.apache.commons.lang3.StringUtils
-
-import groovy.json.JsonOutput
-import groovy.json.JsonBuilder
-
 // TO DO: Change the DEFAULT_SCHEDULE_TEXT  to 30 day and DEFAULT_CRON_CLEANUP_SCHEDULE to Once a day before deplying to QA or PROD
 //@Field final def DEFAULT_SCHEDULE_JSON = new JsonSlurper().parseText('{"timeUnit": "day", "timeInterval": 30, "dryRun": true, "paceTimeMS": 500, "disablePropertiesSupport": false}')
 @Field final String DEFAULT_SCHEDULE_TEXT = '{"timeUnit": "minute", "timeInterval": 1, "dryRun": true, "paceTimeMS": 500, "disablePropertiesSupport": false}'
