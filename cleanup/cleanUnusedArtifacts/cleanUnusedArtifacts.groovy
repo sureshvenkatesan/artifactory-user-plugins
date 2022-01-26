@@ -58,7 +58,7 @@ executions {
     //curl -X POST -n  "$URL/artifactory/api/plugins/execute/cleanupPolicies?params=command=listReposToSkipCleanup"
     //curl -X POST -n  "$URL/artifactory/api/plugins/execute/cleanupPolicies?params=command=listSkippedPaths"
 
-    cleanupPolicies(groups: [pluginGroup]) { params ->
+    cleanupPolicies(httpMethod: 'GET', groups: [pluginGroup]) { params ->
         def command = params['command'] ? params['command'][0] as String : ''
 
         switch ( command ) {
@@ -201,7 +201,7 @@ private def cleanupAllLocalandFederatedRepos()
 
 }
 
-// Returns a json list if repos with "cleanup.skip" set to true
+// Returns a json list of repos with "cleanup.skip" set to true
 private String getPolicyForReposToSkipCleanup()
 {
 
@@ -234,7 +234,7 @@ private String getPolicyForReposToSkipCleanup()
 }
 
 
-// Returns a json list if repos with custom or default cleanup policy 
+// Returns a json list of repos with custom or default cleanup policy 
 private String getPolicyForReposWithCleanup()
 {
             List<String> local_repos = getLocalReposNeedingCleanup()
@@ -266,25 +266,25 @@ private String getPolicyForReposWithCleanup()
 
 }
 
-//Returns a List of Local  repos  to skip cleanup i.e  have no "cleanup.skip" or  "cleanup.skip" is  "true"
+//Returns a List of Local  repos  to skip cleanup i.e    "cleanup.skip" is  "true"
 private List<String> getLocalReposToSkipCleanup() {
     List<String> localRepoKeys = repositories.getLocalRepositories()
     
 
     localRepoKeys.findAll { String repoKey ->
-        repositories.getProperty(RepoPathFactory.create(repoKey),"cleanup.skip")?.equalsIgnoreCase("true")          
+        !repoKey.toLowerCase().contains("dev_local") || repositories.getProperty(RepoPathFactory.create(repoKey),"cleanup.skip")?.equalsIgnoreCase("true")          
     }
 
 }
 
-//Returns a List of Federated  repos  to skip cleanup i.e  have no "cleanup.skip" or  "cleanup.skip" is  "true"
+//Returns a List of Federated  repos  to skip cleanup i.e    "cleanup.skip" is  "true"
 
 private List<String> getFederatedReposToSkipCleanup() {
     List<String> federatedRepoKeys = repositories.getFederatedRepositories()
     
 
     federatedRepoKeys.findAll { String repoKey ->
-        repositories.getProperty(RepoPathFactory.create(repoKey),"cleanup.skip")?.equalsIgnoreCase("true")          
+       !repoKey.toLowerCase().contains("dev_local") || repositories.getProperty(RepoPathFactory.create(repoKey),"cleanup.skip")?.equalsIgnoreCase("true")          
     }
 
 
@@ -292,11 +292,12 @@ private List<String> getFederatedReposToSkipCleanup() {
 
 //Returns a List of Local  repos that need cleanup i.e  Have no "cleanup.skip" or  "cleanup.skip" is not "true"
 private List<String> getLocalReposNeedingCleanup() {
-    List<String> localRepoKeys = repositories.getLocalRepositories()
-    
+    //If repo name contains dev_local then clean. Only check this. NO need to check form prod_local. This way the clean net is restricted.
+   // List<String> localRepoKeys = (repositories.getLocalRepositories())*.toLowerCase().contains("dev_local")?:null
+     List<String> localRepoKeys = repositories.getLocalRepositories()
 
     localRepoKeys.findAll { String repoKey ->
-        !repositories.getProperty(RepoPathFactory.create(repoKey),"cleanup.skip")?.equalsIgnoreCase("true")          
+        repoKey.toLowerCase().contains("dev_local") && !repositories.getProperty(RepoPathFactory.create(repoKey),"cleanup.skip")?.equalsIgnoreCase("true")          
     }
 
 }
@@ -309,7 +310,7 @@ private List<String> getFederatedReposNeedingCleanup() {
     
 
     federatedRepoKeys.findAll { String repoKey ->
-        !repositories.getProperty(RepoPathFactory.create(repoKey),"cleanup.skip")?.equalsIgnoreCase("true")          
+       repoKey.toLowerCase().contains("dev_local") && !repositories.getProperty(RepoPathFactory.create(repoKey),"cleanup.skip")?.equalsIgnoreCase("true")          
     }
 
 
@@ -322,7 +323,7 @@ private List<String> getLocalDockerReposNeedingCleanup() {
 
     localRepoKeys.findAll { String repoKey ->
         if(repositories.getRepositoryConfiguration(repoKey)?.isEnableDockerSupport()){
-            !repositories.getProperty(RepoPathFactory.create(repoKey),"cleanup.skip")?.equalsIgnoreCase("true")
+            repoKey.toLowerCase().contains("dev_local") && !repositories.getProperty(RepoPathFactory.create(repoKey),"cleanup.skip")?.equalsIgnoreCase("true")
                
 
         }
@@ -336,7 +337,7 @@ private List<String> getFederatedDockerReposNeedingCleanup() {
 
     federatedRepoKeys.findAll { String repoKey ->
         if(repositories.getRepositoryConfiguration(repoKey)?.isEnableDockerSupport()){
-            !repositories.getProperty(RepoPathFactory.create(repoKey),"cleanup.skip")?.equalsIgnoreCase("true")
+           repoKey.toLowerCase().contains("dev_local") && !repositories.getProperty(RepoPathFactory.create(repoKey),"cleanup.skip")?.equalsIgnoreCase("true")
                
 
         }
@@ -350,7 +351,7 @@ private List<String> getLocalNonDockerReposNeedingCleanup() {
 
     localRepoKeys.findAll { String repoKey ->
         if(!repositories.getRepositoryConfiguration(repoKey)?.isEnableDockerSupport()){
-            !repositories.getProperty(RepoPathFactory.create(repoKey),"cleanup.skip")?.equalsIgnoreCase("true")
+            repoKey.toLowerCase().contains("dev_local") && !repositories.getProperty(RepoPathFactory.create(repoKey),"cleanup.skip")?.equalsIgnoreCase("true")
                
 
         }
@@ -364,7 +365,7 @@ private List<String> getFederatedNonDockerReposNeedingCleanup() {
 
     federatedRepoKeys.findAll { String repoKey ->
         if(!repositories.getRepositoryConfiguration(repoKey)?.isEnableDockerSupport()){
-            !repositories.getProperty(RepoPathFactory.create(repoKey),"cleanup.skip")?.equalsIgnoreCase("true")
+            repoKey.toLowerCase().contains("dev_local") && !repositories.getProperty(RepoPathFactory.create(repoKey),"cleanup.skip")?.equalsIgnoreCase("true")
                
 
         }
