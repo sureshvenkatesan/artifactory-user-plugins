@@ -88,20 +88,20 @@ Operation
 
 -  Reload the Plugin.
 
-`curl -X POST -n "$URL/artifactory/api/plugins/reload"`
+`curl -X GET -n "$URL/artifactory/api/plugins/reload"`
 
 - Repos needing cleanup
 
-`curl -X POST -n  "$URL/artifactory/api/plugins/execute/cleanupPolicies?params=command=listReposToCleanup"`
+`curl -X GET -n  "$URL/artifactory/api/plugins/execute/cleanupPolicies?params=command=listReposToCleanup"`
 
 - Repos with cleanup.skip = true i.e skip cleanup . 
 
-`curl -X POST -n  "$URL/artifactory/api/plugins/execute/cleanupPolicies?params=command=listReposToSkipCleanup"`
+`curl -X GET -n  "$URL/artifactory/api/plugins/execute/cleanupPolicies?params=command=listReposToSkipCleanup"`
 
 
 - List repos with cleanup schedules that have artifacts that should not be cleaned up  .
 
-`curl -X POST -n  "$URL/artifactory/api/plugins/execute/cleanupPolicies?params=command=listSkippedPaths"`
+`curl -X GET -n  "$URL/artifactory/api/plugins/execute/cleanupPolicies?params=command=listSkippedPaths"`
 
 Example output:
 ```
@@ -120,14 +120,14 @@ Example output:
 }
 ```
 
-- Do the cleanup  
+- Do on-demand cleanup  
 
-`curl -X POST -n  "$URL/artifactory/api/plugins/execute/cleanUnusedArtifacts"`
+`curl -X GET -n  "$URL/artifactory/api/plugins/execute/cleanUnusedArtifacts"`
 
 - Stop the cleanup
 
-`curl -X POST -n  "$URL/artifactory/api/plugins/execute/cleanupPolicies?params=command=stopCleanup"`
+`curl -X GET -n  "$URL/artifactory/api/plugins/execute/cleanupPolicies?params=command=stopCleanup"`
 
 - Resume the cleanup.
 
-`curl -X POST -n  "$URL/artifactory/api/plugins/execute/cleanupPolicies?params=command=resumeCleanup"`
+`curl -X GET -n  "$URL/artifactory/api/plugins/execute/cleanupPolicies?params=command=resumeCleanup"`
