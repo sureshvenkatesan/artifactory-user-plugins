@@ -67,22 +67,27 @@ items.find({
                 }).include("repo", "name", "path", "updated", "created", "sha256", "stat")
 ```
 c) For all non Docker repos the cleanup is done based on 
-searches.artifactsNotDownloadedSince API
+*searches.artifactsNotDownloadedSince* API
 
-1. Reload the Plugin.
-curl -X POST -n "$URL/artifactory/api/plugins/reload"
+Operation
+---------
 
-2. Repos needing cleanup
-curl -X POST -n  "$URL/artifactory/api/plugins/execute/cleanupPolicies?params=command=listReposToCleanup"
+-  Reload the Plugin.
 
-3. Repos with cleanup.skip = true i.e skip cleanup . 
+`curl -X POST -n "$URL/artifactory/api/plugins/reload"`
 
-curl -X POST -n  "$URL/artifactory/api/plugins/execute/cleanupPolicies?params=command=listReposToSkipCleanup"
+- Repos needing cleanup
+
+`curl -X POST -n  "$URL/artifactory/api/plugins/execute/cleanupPolicies?params=command=listReposToCleanup"`
+
+- Repos with cleanup.skip = true i.e skip cleanup . 
+
+`curl -X POST -n  "$URL/artifactory/api/plugins/execute/cleanupPolicies?params=command=listReposToSkipCleanup"`
 
 
-4. List repos with cleanup schedules that have artifacts that should not be cleaned up  .
+- List repos with cleanup schedules that have artifacts that should not be cleaned up  .
 
-curl -X POST -n  "$URL/artifactory/api/plugins/execute/cleanupPolicies?params=command=listSkippedPaths"
+`curl -X POST -n  "$URL/artifactory/api/plugins/execute/cleanupPolicies?params=command=listSkippedPaths"`
 
 Example output:
 ```
@@ -101,13 +106,14 @@ Example output:
 }
 ```
 
-5. Do the cleanup  
+- Do the cleanup  
 
-curl -X POST -n  "$URL/artifactory/api/plugins/execute/cleanUnusedArtifacts"
+`curl -X POST -n  "$URL/artifactory/api/plugins/execute/cleanUnusedArtifacts"`
 
-6. You can stop the cleanup
+- Stop the cleanup
 
-curl -X POST -n  "$URL/artifactory/api/plugins/execute/cleanupPolicies?params=command=stopCleanup"
+`curl -X POST -n  "$URL/artifactory/api/plugins/execute/cleanupPolicies?params=command=stopCleanup"`
 
-7. You can resume the cleanup.
-curl -X POST -n  "$URL/artifactory/api/plugins/execute/cleanupPolicies?params=command=resumeCleanup"
+- Resume the cleanup.
+
+`curl -X POST -n  "$URL/artifactory/api/plugins/execute/cleanupPolicies?params=command=resumeCleanup"`
