@@ -1,5 +1,11 @@
 Artifactory Unused Artifacts Cleanup User Plugin
 ================================================
+To apply the plugin to a Artifactory HA cluster for the first time , copy the cleanUnusedArtifacts.groovy to ${ARTIFACTORY_HOME}/etc/artifactory/plugins folder any node and restart the Artifactory service on that node. Now you will see the plugin appear on ${ARTIFACTORY_HOME}/etc/artifactory/plugins folder on all other nodes in the HA cluster. Then do a rolling restart of the Artifactory service on all other nodes.
+
+After the plugin is activated in the Artifactory cluster ,  any new changes to the plugin can be applied by just invoking the "reload" API
+
+`curl -X POST -n "$URL/artifactory/api/plugins/reload"`
+
 
 A custom cleanup schedule can be defined for any Repository by setting a  
 [Property](https://www.jfrog.com/confluence/display/RTF/Properties)
@@ -88,7 +94,7 @@ Operation
 
 -  Reload the Plugin.
 
-`curl -X GET -n "$URL/artifactory/api/plugins/reload"`
+`curl -X POST -n "$URL/artifactory/api/plugins/reload"`
 
 - Repos needing cleanup
 
@@ -122,7 +128,7 @@ Example output:
 
 - Do on-demand cleanup  
 
-`curl -X GET -n  "$URL/artifactory/api/plugins/execute/cleanUnusedArtifacts"`
+`curl -X POST -n  "$URL/artifactory/api/plugins/execute/cleanUnusedArtifacts"`
 
 - Stop the cleanup
 
