@@ -1,5 +1,19 @@
 Artifactory Unused Artifacts Cleanup User Plugin
 ================================================
+**Note:** This plugin is further customized to clean only the local and federated repositories that contain "dev_local" in the repo names. This customization is done in the following methods:
+
+```
+getLocalReposToSkipCleanup()
+getFederatedReposToSkipCleanup()
+getLocalReposNeedingCleanup()
+getFederatedReposNeedingCleanup()
+getLocalDockerReposNeedingCleanup()
+getFederatedDockerReposNeedingCleanup()
+getLocalNonDockerReposNeedingCleanup()
+getFederatedNonDockerReposNeedingCleanup()
+```
+ 
+ 
 To apply the plugin to a Artifactory HA cluster for the first time , copy the cleanUnusedArtifacts.groovy to ${ARTIFACTORY_HOME}/etc/artifactory/plugins folder any node and restart the Artifactory service on that node. Now you will see the plugin appear on ${ARTIFACTORY_HOME}/etc/artifactory/plugins folder on all other nodes in the HA cluster. Then do a rolling restart of the Artifactory service on all other nodes.
 
 After the plugin is activated in the Artifactory cluster ,  any new changes to the plugin can be applied by just invoking the "reload" API
